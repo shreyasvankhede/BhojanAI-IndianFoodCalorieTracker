@@ -27,7 +27,7 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.session_state.username = u
 
-               
+                st.success("Login successfull")
                 st.switch_page("pages/Food_Detection.py")
             else:
                 st.error("Invalid credentials")
@@ -57,9 +57,13 @@ if not st.session_state.logged_in:
 
             else:
                 if auth.register(u, p):
-                    st.success("User created! You can now login.")
+                    st.success("User created! You are being logged in")
+                    st.session_state.logged_in = True
+                    st.session_state.username = u
+                    st.switch_page("pages/Food_Detection.py")
                 else:
                     st.error("User already exists")
 
 else:
+    st.success("You are already logged in,redirecting")
     st.switch_page("pages/Food_Detection.py")

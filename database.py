@@ -7,18 +7,12 @@ class UserDB:
 
     def create_db(self):
         self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS meal_items(
+            CREATE TABLE IF NOT EXISTS meals(
                item_id INTEGER PRIMARY KEY AUTOINCREMENT,
-               meal_id INTEGER,
+               meal_type INTEGER,
                meal_time DATETIME DEFAULT CURRENT_TIMESTAMP,
                dish_name TEXT,
-               quantity_g REAL,
-               calories REAL,
-               carbs REAL,
-               protein REAL,
-               fats REAL,
-               fibre REAL,
-               sugar REAL
+               quantity_g REAL
                )
                ;""")
 

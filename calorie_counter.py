@@ -5,6 +5,7 @@ from ultralytics import YOLO
 from collections import Counter
 from datetime import datetime
 import hashlib
+import pandas as pd
 
 
 # -------------------------
@@ -35,7 +36,12 @@ class User:
         self.username =username
         self.hash_name=hashlib.sha256((username.strip().lower()).encode()).hexdigest()
         self.USER_PATH = f"data/Users/{self.hash_name}.sqlite"
+    
 
+    def _get_conn(self):
+        conn = sqlite3.connect(self.USER_PATH)
+        conn.execute(f"ATTACH DATABASE '{DB_PATH}' AS food_db")
+        return conn
     # -------------------------
     # FOOD LOOKUP
     # -------------------------
@@ -83,17 +89,7 @@ class User:
     # -------------------------
     # CREATE MEAL
     # -------------------------
-    def create_meal(self):
-        conn = sqlite3.connect(self.USER_PATH)
-        cursor = conn.cursor()
-
-        cursor.execute("INSERT INTO meal_items DEFAULT VALUES")
-        meal_id = cursor.lastrowid
-
-        conn.commit()
-        conn.close()
-
-        return meal_id
+    
 
     # -------------------------
     # CALCULATION (PER 100g → quantity)
@@ -105,33 +101,26 @@ class User:
     # -------------------------
     # ADD FOOD TO MEAL
     # -------------------------
-    def add_food_to_meal(self, meal_id, food, quantity=1):
+    def add_food_to_meal(self, meal_type:str, food, quantity=100):
         nutrition = self.get_food_info(food)
-
+        meal_type=meal_type.upper()
+        meal_type=getattr(MealType, meal_type)
         if nutrition is None:
             print("Food not found")
             return
 
-        cal, carb, protein, fats, sugar, fibre = self.calculate_nutrition(nutrition, quantity)
 
         conn = sqlite3.connect(self.USER_PATH)
         cursor = conn.cursor()
 
         cursor.execute("""
-            INSERT INTO meal_items
-            (meal_id, dish_name, quantity_g,
-             calories, carbs, protein, fats, fibre, sugar)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO meals
+            (meal_type, dish_name, quantity_g)
+            VALUES (?, ?, ?)
         """, (
-            meal_id,
+            meal_type,
             food,
-            quantity,
-            cal,
-            carb,
-            protein,
-            fats,
-            fibre,
-            sugar
+            quantity
         ))
 
         conn.commit()
@@ -140,20 +129,34 @@ class User:
     # -------------------------
     # CALCULATE SINGLE MEAL TOTAL
     # -------------------------
-    def calculate_meal_cals(self, meal_id, date=DATE):
-        conn = sqlite3.connect(self.USER_PATH)
+
+    def calculate_meal_cals(self, meal_type, date=DATE):
+        meal_type=meal_type.upper()
+        meal_type=getattr(MealType, meal_type)
+        conn = self._get_conn()
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT SUM(mi.calories), SUM(mi.carbs), SUM(mi.protein),
-                   SUM(mi.fats), SUM(mi.fibre), SUM(mi.sugar)
-            FROM meal_items mi
-            JOIN meals m ON mi.meal_id = m.meal_id
-            WHERE mi.meal_id = ? AND DATE(m.meal_time) = ?
-        """, (meal_id, date))
+            SELECT
+                SUM((mi.quantity_g / 100.0) * f.calories_kcal),
+                SUM((mi.quantity_g / 100.0) * f.carbohydrates_g),
+                SUM((mi.quantity_g / 100.0) * f.protein_g),
+                SUM((mi.quantity_g / 100.0) * f.fats_g),
+                SUM((mi.quantity_g / 100.0) * f.fibre_g),
+                SUM((mi.quantity_g / 100.0) * f.free_sugar_g)
+            FROM meals mi
+            JOIN meals m ON mi.meal_type = m.meal_type
+            JOIN food_db.foods_master f
+                ON mi.dish_name = f.dish_name
+            WHERE mi.meal_type = ?
+            AND DATE(m.meal_time) = ?
+        """, (meal_type, date))
 
         result = cursor.fetchone()
         conn.close()
+
+        if result is None:
+            return (0, 0, 0, 0, 0, 0)
 
         return tuple(x or 0 for x in result)
 
@@ -161,19 +164,30 @@ class User:
     # DAILY TOTAL
     # -------------------------
     def calculate_daily_macros(self, date=DATE):
-        conn = sqlite3.connect(self.USER_PATH)
+
+        conn = self._get_conn()
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT SUM(mi.calories), SUM(mi.carbs), SUM(mi.protein),
-                   SUM(mi.fats), SUM(mi.fibre), SUM(mi.sugar)
-            FROM meal_items mi
-            JOIN meals m ON mi.meal_id = m.meal_id
+            SELECT
+                SUM((mi.quantity_g / 100.0) * f.calories_kcal),
+                SUM((mi.quantity_g / 100.0) * f.carbohydrates_g),
+                SUM((mi.quantity_g / 100.0) * f.protein_g),
+                SUM((mi.quantity_g / 100.0) * f.fats_g),
+                SUM((mi.quantity_g / 100.0) * f.fibre_g),
+                SUM((mi.quantity_g / 100.0) * f.free_sugar_g)
+            FROM meals mi
+            JOIN meals m ON mi.meal_type = m.meal_type
+            JOIN food_db.foods_master f
+                ON mi.dish_name = f.dish_name
             WHERE DATE(m.meal_time) = ?
         """, (date,))
 
         result = cursor.fetchone()
         conn.close()
+
+        if result is None:
+            return (0, 0, 0, 0, 0, 0)
 
         return tuple(x or 0 for x in result)
 
@@ -181,58 +195,62 @@ class User:
     # EDIT / DELETE ENTRY
     # -------------------------
     def change_entry(self, item_id, new_quantity=None, delete_entry=False):
-        conn = sqlite3.connect(self.USER_PATH)
+
+        conn = self._get_conn()
         cursor = conn.cursor()
 
         if delete_entry:
-            cursor.execute("DELETE FROM meal_items WHERE item_id=?", (item_id,))
+            cursor.execute(
+                "DELETE FROM meals WHERE item_id=?",
+                (item_id,)
+            )
             conn.commit()
             conn.close()
             return "Entry deleted"
 
-        cursor.execute("""
-            SELECT dish_name, quantity_g
-            FROM meal_items
-            WHERE item_id = ?
-        """, (item_id,))
-
-        row = cursor.fetchone()
-
-        if row is None:
+        if new_quantity is None:
             conn.close()
-            return "Item not found"
-
-        dish_name, old_quantity = row
-
-        nutrition = self.get_food_info(dish_name)
-        cal, carb, protein, fats, sugar, fibre = self.calculate_nutrition(nutrition, new_quantity)
+            return "No quantity provided"
 
         cursor.execute("""
-            UPDATE meal_items
-            SET quantity_g=?, calories=?, carbs=?, protein=?, fats=?, fibre=?, sugar=?
+            UPDATE meals
+            SET quantity_g=?
             WHERE item_id=?
-        """, (
-            new_quantity,
-            cal,
-            carb,
-            protein,
-            fats,
-            fibre,
-            sugar,
-            item_id
-        ))
+        """, (new_quantity, item_id))
 
         conn.commit()
         conn.close()
 
         return "Entry updated"
-    def get_meal_entries(self,date=DATE):
-        conn=sqlite3.connect(self.USER_PATH)
-        cursor=conn.cursor()
+    
+    def get_meal_entries(self, meal_type, date=DATE):
+        meal_type=meal_type.upper()
+        meal_type=getattr(MealType, meal_type)
+        conn = self._get_conn()
 
-        cursor.execute("""
-            SELECT 
-            """)
+        query = """
+            SELECT
+                mi.item_id,
+                mi.dish_name,
+                mi.quantity_g,
+                (mi.quantity_g / 100.0) * f.calories_kcal AS calories,
+                (mi.quantity_g / 100.0) * f.carbohydrates_g AS carbs,
+                (mi.quantity_g / 100.0) * f.protein_g AS protein,
+                (mi.quantity_g / 100.0) * f.fats_g AS fats,
+                (mi.quantity_g / 100.0) * f.fibre_g AS fibre,
+                (mi.quantity_g / 100.0) * f.free_sugar_g AS sugar
+            FROM meals mi
+            JOIN meals m ON mi.meal_type = m.meal_type
+            JOIN food_db.foods_master f
+                ON mi.dish_name = f.dish_name
+            WHERE mi.meal_type = ?
+            AND DATE(m.meal_time) = ?
+        """
+
+        df = pd.read_sql_query(query, conn, params=(meal_type, date))
+        conn.close()
+
+        return df
 
     # -------------------------
     # YOLO DETECTION (USES GLOBAL MODEL)

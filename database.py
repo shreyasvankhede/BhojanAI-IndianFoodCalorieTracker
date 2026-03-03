@@ -15,9 +15,19 @@ class UserDB:
                quantity_g REAL
                )
                ;""")
+        self.cursor.execute("""
+CREATE TABLE IF NOT EXISTS user_profile (
+    username TEXT PRIMARY KEY,
+    age INTEGER,
+    gender TEXT,
+    weight REAL,
+    height REAL,
+    activity_level TEXT
+);""")
 
         self.conn.commit()
         self.conn.close()
+        
 
 
 """

@@ -42,6 +42,37 @@ class User:
         conn = sqlite3.connect(self.USER_PATH)
         conn.execute(f"ATTACH DATABASE '{DB_PATH}' AS food_db")
         return conn
+    
+
+    def add_profile_details(self, username, age, gender, weight, height, activity):
+
+     conn = sqlite3.connect(self.USER_PATH)
+     cursor = conn.cursor()
+
+     cursor.execute("""
+        INSERT OR REPLACE INTO user_profile
+        (username, age, gender, weight, height, activity_level)
+        VALUES (?, ?, ?, ?, ?, ?)
+     """, (username, age, gender, weight, height, activity))
+
+     conn.commit()
+     conn.close()
+
+    def get_profile_details(self, username):
+     conn = sqlite3.connect(self.USER_PATH)
+     cursor = conn.cursor()
+
+     cursor.execute("""
+        SELECT age, gender, weight, height, activity_level
+        FROM user_profile
+        WHERE username = ?
+     """, (username,))
+
+     result = cursor.fetchone()
+
+     conn.close()
+     return result
+ 
     # -------------------------
     # FOOD LOOKUP
     # -------------------------
@@ -101,7 +132,7 @@ class User:
     # -------------------------
     # ADD FOOD TO MEAL
     # -------------------------
-    def add_food_to_meal(self, meal_type:str, food, quantity=100):
+    def add_food_to_meal(self, meal_type:str, food, quantity=100,date=DATE):
         nutrition = self.get_food_info(food)
         meal_type=meal_type.upper()
         meal_type=getattr(MealType, meal_type)
@@ -115,12 +146,13 @@ class User:
 
         cursor.execute("""
             INSERT INTO meals
-            (meal_type, dish_name, quantity_g)
-            VALUES (?, ?, ?)
+            (meal_type, dish_name, quantity_g,meal_time)
+            VALUES (?, ?, ?,?)
         """, (
             meal_type,
             food,
-            quantity
+            quantity,
+            date
         ))
 
         conn.commit()
@@ -274,6 +306,8 @@ class User:
         class_counts = Counter(detected_names)
 
         return class_counts, detected_names
+    
+
        
 
 

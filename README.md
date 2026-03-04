@@ -9,10 +9,17 @@ A full-stack calorie tracker built for Indian cuisine. It combines a custom-trai
 ![SQLite](https://img.shields.io/badge/SQLite-Database-lightgrey)
 
 ---
+##Screenshots
+<img width="1920" height="1080" alt="Screenshot 2026-03-04 195146" src="https://github.com/user-attachments/assets/f9612bd5-0f8b-4062-ae4c-cd25ef295eaa" />
+<img width="1920" height="1080" alt="Screenshot 2026-03-04 195224" src="https://github.com/user-attachments/assets/639625b9-ad8d-490b-9250-0322bb45da2e" />
 
-## Demo
+<img width="1920" height="1080" alt="Screenshot 2026-03-04 195234" src="https://github.com/user-attachments/assets/4cecbc38-169f-4c84-8d2c-53c78242be11" />
 
-*(Add a screen recording or GIF of the app here)*
+<img width="1522" height="1064" alt="image" src="https://github.com/user-attachments/assets/7ffd9e0e-73a8-44b9-b2ef-d4d0c1a24d13" />
+
+
+https://github.com/user-attachments/assets/8d05d0ec-ee50-497a-b42f-5fe6e1ec1fe0
+
 
 ---
 
@@ -20,7 +27,7 @@ A full-stack calorie tracker built for Indian cuisine. It combines a custom-trai
 
 Most calorie tracking apps don't work well for Indian food. You search for "chole bhature" or "masala dosa" and either get no results or something completely wrong.
 
-For this project, images were sourced from the [Indian Food Classification dataset on Kaggle](https://www.kaggle.com/datasets/theeyeschico/indian-food-classification), manually sorted per food class, and labeled with bounding boxes to train a YOLOv8 model from scratch. Nutrition data (calories, carbs, protein, fats, fibre, sugar) was sourced from the [Anuvaad Indian Diet Data Portal](https://www.anuvaad.org.in/indian-diet-data-portal/) and cleaned before being loaded into SQLite.
+For this project, images were sourced from the [Indian Food Classification dataset on Kaggle](https://www.kaggle.com/datasets/theeyeschico/indian-food-classification), manually sorted per food class, and manually labeled with bounding boxes to train a YOLOv8 model from scratch. Nutrition data (calories, carbs, protein, fats, fibre, sugar) was sourced from the [Anuvaad Indian Diet Data Portal](https://www.anuvaad.org.in/indian-diet-data-portal/) and cleaned before being loaded into SQLite.
 
 ---
 
@@ -48,6 +55,9 @@ For this project, images were sourced from the [Indian Food Classification datas
 | Paani Puri | 0.763 | Roll | 0.793 |
 | Naan | 0.650 | Momos | 0.485 |
 | Kulfi | 0.581 | Idli | 0.386 |
+
+<img width="848" height="379" alt="Screenshot 2026-03-04 181923" src="https://github.com/user-attachments/assets/78307b38-8ad7-4815-9c08-e9808d179e1f" />
+
 
 Classes like idli (0.386), momos (0.485), and kulfi (0.581) score lower because they had fewer than 15 training images each. Adding more training data for these classes is the most straightforward way to improve them.
 
